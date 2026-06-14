@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+  <title>Training Log</title>
+  <meta name="theme-color" content="#eef1f5" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Training Log" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/recharts/umd/Recharts.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    html, body, #root { height: 100%; margin: 0; }
+    body { -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
+    input { font-size: 16px; } /* stop iOS zoom on focus */
+    ::-webkit-scrollbar { display: none; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" data-presets="react">
+    const { useState, useEffect, useRef, useCallback } = React;
+    const { LineChart, Line, BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } = window.Recharts;
+
+    /* ---------- inline SVG icons (replaces lucide-react) ---------- */
+    function Ico({ n, size = 24, color = "currentColor", className = "" }) {
+      const common = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: color, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", className };
+      switch (n) {
+        case "dumbbell": return <svg {...common}><path d="M6 5v14M3 8v8M21 8v8M18 5v14M6 12h12" /></svg>;
+        case "check": return <svg {...common}><path d="M20 6 9 17l-5-5" /></svg>;
+        case "timer": return <svg {...common}><path d="M10 2h4" /><path d="M12 14l3-3" /><circle cx="12" cy="14" r="8" /></svg>;
+        case "trending-up": return <svg {...common}><path d="M22 7 13.5 15.5 8.5 10.5 2 17" /><path d="M16 7h6v6" /></svg>;
+        case "target": return <svg {...common}><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></svg>;
+        case "plus": return <svg {...common}><path d="M5 12h14M12 5v14" /></svg>;
+        case "minus": return <svg {...common}><path d="M5 12h14" /></svg>;
+        case "rotate-ccw": return <svg {...common}><path d="M3 2v6h6" /><path d="M3.51 9a9 9 0 1 0 2.13-3.36L3 8" /></svg>;
+        case "flame": return <svg {...common}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>;
+        case "chevron-right": return <svg {...common}><path d="m9 18 6-6-6-6" /></svg>;
+        case "square": return <svg {...common}><rect x="3" y="3" width="18" height="18" rx="2" /></svg>;
+        case "repeat": return <svg {...common}><path d="m17 2 4 4-4 4" /><path d="M3 11v-1a4 4 0 0 1 4-4h14" /><path d="m7 22-4-4 4-4" /><path d="M21 13v1a4 4 0 0 1-4 4H3" /></svg>;
+        case "calculator": return <svg {...common}><rect x="4" y="2" width="16" height="20" rx="2" /><path d="M8 6h8M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01" /></svg>;
+        case "play": return <svg {...common} fill={color} stroke="none"><path d="M6 3v18l15-9z" /></svg>;
+        case "alert-triangle": return <svg {...common}><path d="m10.29 3.86-8.18 14A2 2 0 0 0 3.84 21h16.32a2 2 0 0 0 1.73-3l-8.18-14a2 2 0 0 0-3.42 0z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>;
+        case "activity": return <svg {...common}><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg>;
+        default: return null;
+      }
+    }
+    const Dumbbell = (p) => <Ico n="dumbbell" {...p} />;
+    const Check = (p) => <Ico n="check" {...p} />;
+    const Timer = (p) => <Ico n="timer" {...p} />;
+    const TrendingUp = (p) => <Ico n="trending-up" {...p} />;
+    const Target = (p) => <Ico n="target" {...p} />;
+    const Plus = (p) => <Ico n="plus" {...p} />;
+    const Minus = (p) => <Ico n="minus" {...p} />;
+    const RotateCcw = (p) => <Ico n="rotate-ccw" {...p} />;
+    const Flame = (p) => <Ico n="flame" {...p} />;
+    const ChevronRight = (p) => <Ico n="chevron-right" {...p} />;
+    const Square = (p) => <Ico n="square" {...p} />;
+    const Repeat = (p) => <Ico n="repeat" {...p} />;
+    const Calculator = (p) => <Ico n="calculator" {...p} />;
+    const Play = (p) => <Ico n="play" {...p} />;
+    const AlertTriangle = (p) => <Ico n="alert-triangle" {...p} />;
+    const Activity = (p) => <Ico n="activity" {...p} />;
+
+    /* ---------- "chalk & iron" light palette ---------- */
+    const C = {
+      bg: "#eef1f5", surface: "#ffffff", surface2: "#f3f5f9", border: "#dce2e9",
+      text: "#161a20", muted: "#5c6773", faint: "#9aa5b1",
+      red: "#dc2626", redDim: "#fdecec", redInk: "#9b1c1c",
+      green: "#15803d", greenDim: "#dcfce7",
+      amber: "#b45309", amberDim: "#fdf2dc", amberInk: "#8a5a12",
+    };
+    const SHADOW = "0 1px 3px rgba(16,24,40,0.07)";
+    const MUSCLE_COLOR = {
+      chest: "#dc2626", back: "#2563eb", shoulders: "#d97706", arms: "#7c3aed",
+      quads: "#16a34a", hams: "#0d9488", glutes: "#db2777", calves: "#ea580c", core: "#64748b",
+    };
+
+    const SETS = 3;
+    const DAYS = {
+      "Upper A": { focus: "Chest · Back · Shoulders · Arms", cue: "Squeeze shoulder blades on rows. Lateral raises stay light — lead with the elbows.", ex: [
+        { id: "ua1", n: "Incline DB / machine press", t: "8–12", q: "incline dumbbell press", m: "chest", inc: 5, alts: ["Machine chest press", "Incline barbell press", "Flat DB press"] },
+        { id: "ua2", n: "Chest-supported row", t: "8–12", q: "chest supported row", m: "back", inc: 5, alts: ["Seal row", "Machine row", "Single-arm DB row"] },
+        { id: "ua3", n: "Lat pulldown", t: "10–12", q: "lat pulldown", m: "back", inc: 5, alts: ["Neutral-grip pulldown", "Assisted pull-up", "Straight-arm pulldown"] },
+        { id: "ua4", n: "Seated DB shoulder press", t: "10–12", q: "seated dumbbell shoulder press", m: "shoulders", inc: 5, alts: ["Machine shoulder press", "Arnold press", "Seated barbell press"] },
+        { id: "ua5", n: "Lateral raises", t: "12–15", q: "dumbbell lateral raise", m: "shoulders", inc: 5, alts: ["Cable lateral raise", "Machine lateral raise"] },
+        { id: "ua6", n: "Triceps pushdown", t: "12–15", q: "cable triceps pushdown", m: "arms", inc: 5, alts: ["Overhead cable extension", "Skull crushers", "Assisted dips"] },
+        { id: "ua7", n: "DB biceps curls", t: "10–12", q: "dumbbell biceps curl", m: "arms", inc: 5, alts: ["Cable curl", "EZ-bar curl", "Hammer curl"] },
+      ] },
+      "Lower A": { focus: "Quad focus · back-supported", cue: "Keep your lower back flat against the seat on every press. Never let it round at the bottom.", ex: [
+        { id: "la1", n: "Leg press (main quad)", t: "10–12", q: "leg press proper form", m: "quads", inc: 10, alts: ["Hack squat", "Belt squat", "Light goblet squat"] },
+        { id: "la2", n: "Hack / belt / pendulum squat", t: "10–12", q: "hack squat machine", m: "quads", inc: 10, alts: ["Leg press", "Belt squat", "Pendulum squat"] },
+        { id: "la3", n: "Leg extension", t: "12–15", q: "leg extension machine", m: "quads", inc: 5, alts: ["Sissy squat", "Bodyweight leg extension"] },
+        { id: "la4", n: "Lying / seated leg curl", t: "10–12", q: "seated leg curl", m: "hams", inc: 5, alts: ["Lying leg curl", "Assisted Nordic curl"] },
+        { id: "la5", n: "Standing calf raise", t: "12–20", q: "standing calf raise", m: "calves", inc: 10, alts: ["Smith calf raise", "Leg-press calf raise"] },
+        { id: "la6", n: "Pallof press / dead bug", t: "10–12", q: "pallof press", m: "core", inc: 5, alts: ["Dead bug", "Cable crunch", "Plank"] },
+      ] },
+      "Upper B": { focus: "Chest · Back · Shoulders · Arms", cue: "Face pulls are non-negotiable for shoulder health. Pull cable rows to the stomach, not the chest.", ex: [
+        { id: "ub1", n: "Flat machine / DB press", t: "8–12", q: "flat dumbbell bench press", m: "chest", inc: 5, alts: ["Machine chest press", "Flat barbell press", "Incline DB press"] },
+        { id: "ub2", n: "Cable row (supported)", t: "8–12", q: "seated cable row", m: "back", inc: 5, alts: ["Chest-supported row", "Machine row", "Supported T-bar row"] },
+        { id: "ub3", n: "Lat pulldown, neutral grip", t: "10–12", q: "neutral grip lat pulldown", m: "back", inc: 5, alts: ["Wide-grip pulldown", "Assisted pull-up"] },
+        { id: "ub4", n: "Machine shoulder press", t: "10–12", q: "machine shoulder press", m: "shoulders", inc: 5, alts: ["Seated DB press", "Smith shoulder press"] },
+        { id: "ub5", n: "Face pulls", t: "15", q: "cable face pull", m: "shoulders", inc: 5, alts: ["Reverse pec deck", "Rear delt fly"] },
+        { id: "ub6", n: "Hammer curls", t: "10–12", q: "hammer curl", m: "arms", inc: 5, alts: ["DB biceps curl", "Cable rope curl"] },
+        { id: "ub7", n: "Overhead triceps ext.", t: "12–15", q: "overhead triceps extension", m: "arms", inc: 5, alts: ["Triceps pushdown", "Skull crushers"] },
+      ] },
+      "Lower B": { focus: "Glute / hamstring · back-supported", cue: "Hip thrust: ribs down, chin tucked, drive through heels — don't arch the low back at the top.", ex: [
+        { id: "lb1", n: "Hip thrust (main glute)", t: "10–12", q: "barbell hip thrust", m: "glutes", inc: 10, alts: ["Machine hip thrust", "Glute bridge", "Cable pull-through"] },
+        { id: "lb2", n: "Split squat / 1-leg press", t: "8–10 ea", q: "bulgarian split squat", m: "quads", inc: 5, alts: ["Single-leg press", "Step-up", "Reverse lunge"] },
+        { id: "lb3", n: "Seated leg curl", t: "10–12", q: "seated leg curl", m: "hams", inc: 5, alts: ["Lying leg curl", "Nordic curl"] },
+        { id: "lb4", n: "Leg press, feet high", t: "10–12", q: "leg press feet high glutes", m: "glutes", inc: 10, alts: ["High-foot hack squat", "Machine RDL"] },
+        { id: "lb5", n: "Seated calf raise", t: "15–20", q: "seated calf raise", m: "calves", inc: 10, alts: ["Standing calf raise", "Leg-press calf raise"] },
+        { id: "lb6", n: "Bird dog / plank", t: "10–12", q: "bird dog exercise", m: "core", inc: 5, alts: ["Plank", "Dead bug", "Pallof press"] },
+      ] },
+    };
+    const DAY_KEYS = Object.keys(DAYS);
+    const EX_BY_ID = {};
+    Object.values(DAYS).forEach((d) => d.ex.forEach((e) => { EX_BY_ID[e.id] = e; }));
+
+    const TARGETS = [
+      ["Calories", "2,400", "≈ 1 lb fat loss / week"],
+      ["Protein", "190 g", "the non-negotiable — every meal"],
+      ["Carbs", "240 g", "fuels lifts + cardio"],
+      ["Fat", "75 g", "hormone floor, don't go lower"],
+    ];
+    const RULES = [
+      ["Start too light", "Tendons lag muscles after 2 years off. Soreness isn't the risk — a tweaked back on week 3 is."],
+      ["Beat the logbook", "Each week add a little weight or one more rep than last time. That's the whole engine."],
+      ["Leave 2–3 in the tank", "Stop short of failure. More productive, far safer for a returning lifter."],
+      ["Protect the spine", "No barbell back squats, conventional deadlifts, or bent-over barbell rows."],
+    ];
+    const PLATES = [45, 35, 25, 10, 5, 2.5];
+    const RPE_CYCLE = ["", "7", "8", "9", "10"];
+
+    const store = {
+      async get(key) {
+        try { const v = window.localStorage.getItem(key); return v ? JSON.parse(v) : null; } catch (e) {}
+        return null;
+      },
+      async set(key, val) {
+        try { window.localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
+      },
+    };
+
+    const blankSet = () => ({ w: "", r: "", rpe: "" });
+    const blankEntry = () => ({ sets: Array.from({ length: SETS }, blankSet), done: false });
+    const vol = (s) => (parseFloat(s.w) || 0) * (parseInt(s.r) || 0);
+    const today = () => new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+    function repRange(t) {
+      const m = t.match(/(\d+)\s*[–-]\s*(\d+)/);
+      if (m) return [parseInt(m[1]), parseInt(m[2])];
+      const s = t.match(/(\d+)/);
+      if (s) return [parseInt(s[1]), parseInt(s[1])];
+      return [8, 12];
+    }
+    function suggestNext(ex, lastEntry) {
+      if (!lastEntry) return null;
+      const ref = lastEntry.sets.find((s) => s.w || s.r);
+      if (!ref) return null;
+      const [bottom, top] = repRange(ex.t);
+      const w = parseFloat(ref.w) || 0;
+      const r = parseInt(ref.r) || 0;
+      if (r === 0 && w === 0) return null;
+      if (w === 0) return { w: 0, r: r + 1, note: "+1 rep" };
+      if (r >= top) return { w: w + ex.inc, r: bottom, note: `+${ex.inc} lb` };
+      return { w, r: Math.min(top, r + 1), note: "+1 rep" };
+    }
+    function platesFor(target, bar) {
+      let per = Math.max(0, (target - bar) / 2);
+      const out = [];
+      for (const p of PLATES) { while (per >= p - 0.001) { out.push(p); per -= p; } }
+      return { plates: out, leftover: per > 0.01 ? per.toFixed(1) : null };
+    }
+
+    function App() {
+      const [tab, setTab] = useState("workout");
+      const [day, setDay] = useState("Upper A");
+      const [entries, setEntries] = useState({});
+      const [history, setHistory] = useState({});
+      const [bw, setBw] = useState([]);
+      const [swaps, setSwaps] = useState({});
+      const [deloadAck, setDeloadAck] = useState(0);
+      const [loaded, setLoaded] = useState(false);
+      const [toast, setToast] = useState("");
+      const draftTimer = useRef(null);
+
+      useEffect(() => {
+        (async () => {
+          const main = await store.get("gymlog:v2");
+          const draft = await store.get("gymlog:draft");
+          if (main) { setHistory(main.history || {}); setBw(main.bw || []); setSwaps(main.swaps || {}); setDeloadAck(main.deloadAck || 0); }
+          if (draft) setEntries(draft);
+          setLoaded(true);
+        })();
+      }, []);
+
+      useEffect(() => {
+        if (!loaded) return;
+        clearTimeout(draftTimer.current);
+        draftTimer.current = setTimeout(() => store.set("gymlog:draft", entries), 400);
+      }, [entries, loaded]);
+
+      const persistMain = useCallback((h, b, sw, dl) => store.set("gymlog:v2", { history: h, bw: b, swaps: sw, deloadAck: dl }), []);
+      const flash = (m) => { setToast(m); setTimeout(() => setToast(""), 1900); };
+      const getEntry = (d, id) => (entries[d] && entries[d][id]) || blankEntry();
+      const exName = (ex) => swaps[ex.id] || ex.n;
+      const exQuery = (ex) => swaps[ex.id] || ex.q;
+
+      const setCell = (d, id, i, field, value) => {
+        setEntries((prev) => {
+          const dayObj = { ...(prev[d] || {}) };
+          const e = dayObj[id] ? { ...dayObj[id], sets: dayObj[id].sets.map((s) => ({ ...s })) } : blankEntry();
+          e.sets[i] = { ...e.sets[i], [field]: value }; dayObj[id] = e;
+          return { ...prev, [d]: dayObj };
+        });
+      };
+      const bump = (d, id, i, field, delta) => {
+        const cur = getEntry(d, id).sets[i][field];
+        const base = field === "w" ? (parseFloat(cur) || 0) : (parseInt(cur) || 0);
+        const next = Math.max(0, base + delta);
+        setCell(d, id, i, field, next === 0 && cur === "" ? "" : String(next));
+      };
+      const cycleRpe = (d, id, i) => {
+        const cur = getEntry(d, id).sets[i].rpe || "";
+        setCell(d, id, i, "rpe", RPE_CYCLE[(RPE_CYCLE.indexOf(cur) + 1) % RPE_CYCLE.length]);
+      };
+      const toggleDone = (d, id) => {
+        setEntries((prev) => {
+          const dayObj = { ...(prev[d] || {}) };
+          const e = dayObj[id] ? { ...dayObj[id] } : blankEntry();
+          e.done = !e.done; dayObj[id] = e;
+          return { ...prev, [d]: dayObj };
+        });
+      };
+      const lastSession = (d) => { const a = history[d]; return a && a.length ? a[a.length - 1] : null; };
+      const useLast = (d, id) => {
+        const ls = lastSession(d);
+        const prevSets = ls && ls.entries[id] && ls.entries[id].sets;
+        if (!prevSets) { flash("No previous numbers yet"); return; }
+        setEntries((prev) => ({ ...prev, [d]: { ...(prev[d] || {}), [id]: { sets: prevSets.map((s) => ({ ...s })), done: false } } }));
+      };
+      const applySwap = (id, name) => {
+        const next = { ...swaps };
+        if (name) next[id] = name; else delete next[id];
+        setSwaps(next); persistMain(history, bw, next, deloadAck);
+      };
+
+      const finishWorkout = () => {
+        const dayEntries = entries[day] || {};
+        if (!Object.values(dayEntries).some((e) => e.sets.some((s) => s.w || s.r))) { flash("Log at least one set first"); return; }
+        const snap = { date: today(), ts: Date.now(), entries: dayEntries };
+        const nextHist = { ...history, [day]: [...(history[day] || []), snap] };
+        const nextEntries = { ...entries, [day]: {} };
+        setHistory(nextHist); setEntries(nextEntries);
+        persistMain(nextHist, bw, swaps, deloadAck); store.set("gymlog:draft", nextEntries);
+        flash("Workout logged 💪");
+      };
+
+      const firstTs = Object.values(history).flat().reduce((min, s) => Math.min(min, s.ts), Infinity);
+      const weeksIn = firstTs === Infinity ? 0 : Math.floor((Date.now() - firstTs) / WEEK_MS);
+      const deloadDue = weeksIn >= 6 && weeksIn - deloadAck >= 6;
+      const ackDeload = () => { setDeloadAck(weeksIn); persistMain(history, bw, swaps, weeksIn); flash("Deload noted — go light this week"); };
+
+      const totalWorkouts = Object.values(history).reduce((a, arr) => a + arr.length, 0);
+      const completedCount = Object.values(entries[day] || {}).filter((e) => e.done).length;
+
+      if (!loaded) return <div style={{ background: C.bg, color: C.muted, minHeight: "100vh" }} className="flex items-center justify-center font-sans">Loading your log…</div>;
+
+      return (
+        <div style={{ background: C.bg, color: C.text, minHeight: "100vh" }} className="font-sans">
+          <div className="mx-auto" style={{ maxWidth: 480, paddingBottom: 150 }}>
+            <div style={{ background: C.surface, borderBottom: `1px solid ${C.border}`, boxShadow: SHADOW }} className="px-4 pt-4 pb-3 sticky top-0 z-20">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div style={{ background: C.red }} className="rounded-lg p-1.5"><Dumbbell size={18} color="#fff" /></div>
+                  <div>
+                    <div className="font-extrabold tracking-tight leading-none" style={{ fontSize: 17 }}>TRAINING LOG</div>
+                    <div style={{ color: C.muted, fontSize: 11 }} className="leading-tight">Upper / Lower · 4 days</div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div style={{ color: C.faint, fontSize: 10 }} className="uppercase tracking-wide">Workouts</div>
+                  <div className="font-extrabold font-mono" style={{ fontSize: 18 }}>{totalWorkouts}</div>
+                </div>
+              </div>
+            </div>
+
+            {tab === "workout" && <WorkoutView {...{ day, setDay, getEntry, setCell, bump, cycleRpe, toggleDone, useLast, lastSession, completedCount, finishWorkout, exName, exQuery, swaps, applySwap, deloadDue, weeksIn, ackDeload }} />}
+            {tab === "progress" && <ProgressView {...{ history, bw, setBw, swaps, deloadAck, persistMain, flash }} />}
+            {tab === "targets" && <TargetsView weeksIn={weeksIn} />}
+
+            {toast && <div style={{ background: C.text, color: "#fff", bottom: 86 }} className="fixed left-1/2 -translate-x-1/2 px-4 py-2 rounded-full text-sm z-40 shadow-lg">{toast}</div>}
+
+            <div style={{ background: C.surface, borderTop: `1px solid ${C.border}`, maxWidth: 480, boxShadow: "0 -1px 4px rgba(16,24,40,0.06)" }} className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full flex z-30">
+              {[["workout", "Workout", Dumbbell], ["progress", "Progress", TrendingUp], ["targets", "Targets", Target]].map(([k, label, Icon]) => (
+                <button key={k} onClick={() => setTab(k)} className="flex-1 flex flex-col items-center gap-1 py-3" style={{ color: tab === k ? C.red : C.muted }}>
+                  <Icon size={20} /><span style={{ fontSize: 11 }} className="font-semibold">{label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function WorkoutView(p) {
+      const { day, setDay, getEntry, setCell, bump, cycleRpe, toggleDone, useLast, lastSession, completedCount, finishWorkout, exName, exQuery, swaps, applySwap, deloadDue, weeksIn, ackDeload } = p;
+      const cfg = DAYS[day];
+      const ls = lastSession(day);
+      const [swapOpen, setSwapOpen] = useState(null);
+
+      return (
+        <div className="px-3 pt-3">
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {DAY_KEYS.map((d) => (
+              <button key={d} onClick={() => setDay(d)} className="whitespace-nowrap px-3 py-2 rounded-lg font-bold" style={{ fontSize: 13, background: d === day ? C.red : C.surface, color: d === day ? "#fff" : C.muted, border: `1px solid ${d === day ? C.red : C.border}`, boxShadow: d === day ? "none" : SHADOW }}>{d}</button>
+            ))}
+          </div>
+
+          {deloadDue && (
+            <div style={{ background: C.amberDim, border: `1px solid ${C.amber}55` }} className="rounded-lg px-3 py-2.5 mt-3 flex items-start gap-2">
+              <AlertTriangle size={16} color={C.amber} className="mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <div className="font-bold text-sm" style={{ color: C.amber }}>Deload week suggested</div>
+                <div style={{ color: C.amberInk, fontSize: 12 }} className="leading-snug">You're {weeksIn} weeks in. Drop to ~60% weight for a week to let joints and your back recover. This is when returning lifters get hurt by skipping it.</div>
+              </div>
+              <button onClick={ackDeload} style={{ color: C.amber }} className="text-xs font-bold shrink-0">Got it</button>
+            </div>
+          )}
+
+          <div className="mt-3 mb-2 px-1">
+            <div style={{ color: C.muted, fontSize: 12 }}>{cfg.focus}</div>
+            {ls && <div style={{ color: C.faint, fontSize: 11 }} className="mt-0.5">Last done · {ls.date}</div>}
+          </div>
+
+          <div style={{ background: C.redDim, border: `1px solid ${C.red}33`, color: C.redInk }} className="rounded-lg px-3 py-2 mb-3 text-xs leading-snug">{cfg.cue}</div>
+
+          {cfg.ex.map((ex) => {
+            const e = getEntry(day, ex.id);
+            const prevSets = ls && ls.entries[ex.id] && ls.entries[ex.id].sets;
+            const beating = prevSets && e.sets.some((s, i) => vol(s) > 0 && prevSets[i] && vol(s) > vol(prevSets[i]));
+            const sug = suggestNext(ex, ls && ls.entries[ex.id]);
+            const name = exName(ex);
+            const swapped = !!swaps[ex.id];
+            return (
+              <div key={ex.id} style={{ background: C.surface, border: `1px solid ${e.done ? C.green : C.border}`, boxShadow: SHADOW, opacity: e.done ? 0.96 : 1 }} className="rounded-xl p-3 mb-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-bold leading-tight flex items-center gap-1.5" style={{ fontSize: 14.5 }}>{name}{swapped && <span style={{ color: C.amber, fontSize: 10 }} className="font-semibold">(swapped)</span>}</div>
+                    <div style={{ color: C.muted, fontSize: 11 }} className="mt-0.5">Target {ex.t} reps · 3 sets</div>
+                  </div>
+                  <button onClick={() => toggleDone(day, ex.id)} className="shrink-0 rounded-lg flex items-center justify-center" style={{ width: 34, height: 34, background: e.done ? C.green : "transparent", border: `1.5px solid ${e.done ? C.green : C.border}` }}>
+                    <Check size={18} color={e.done ? "#fff" : C.faint} />
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2 mt-2">
+                  <a href={`https://www.youtube.com/results?search_query=${encodeURIComponent(exQuery(ex) + " proper form")}`} target="_blank" rel="noreferrer" style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }} className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold no-underline"><Play size={13} color={C.red} /> Watch demo</a>
+                  <button onClick={() => setSwapOpen(swapOpen === ex.id ? null : ex.id)} style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }} className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold"><Repeat size={13} color={C.muted} /> Swap</button>
+                  {beating && <span style={{ background: C.greenDim, color: C.green }} className="ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5"><TrendingUp size={12} /><span style={{ fontSize: 11 }} className="font-bold">Beating last</span></span>}
+                </div>
+
+                {swapOpen === ex.id && (
+                  <div style={{ background: C.surface2, border: `1px solid ${C.border}` }} className="rounded-lg p-2 mt-2">
+                    <div style={{ color: C.faint, fontSize: 10 }} className="uppercase tracking-wide mb-1 px-1">Back-friendly alternatives</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      <button onClick={() => { applySwap(ex.id, ""); setSwapOpen(null); }} style={{ background: !swapped ? C.red : C.surface, color: !swapped ? "#fff" : C.text, border: `1px solid ${!swapped ? C.red : C.border}` }} className="rounded-md px-2 py-1 text-xs font-semibold">{ex.n} (default)</button>
+                      {ex.alts.map((a) => (
+                        <button key={a} onClick={() => { applySwap(ex.id, a); setSwapOpen(null); }} style={{ background: swaps[ex.id] === a ? C.red : C.surface, color: swaps[ex.id] === a ? "#fff" : C.text, border: `1px solid ${swaps[ex.id] === a ? C.red : C.border}` }} className="rounded-md px-2 py-1 text-xs font-semibold">{a}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between mt-2.5 mb-1">
+                  <div className="min-w-0">
+                    <div style={{ color: C.faint, fontSize: 11 }} className="font-mono truncate">{prevSets ? "Last: " + prevSets.map((s) => (s.w || s.r) ? `${s.w || "–"}×${s.r || "–"}` : "–").join("  ") : "No previous data"}</div>
+                    {sug && <div style={{ color: C.green, fontSize: 11.5 }} className="font-mono font-bold mt-0.5">Today: try {sug.w ? `${sug.w}×${sug.r}` : `×${sug.r}`} <span style={{ color: C.faint }} className="font-normal">({sug.note})</span></div>}
+                  </div>
+                  {prevSets && <button onClick={() => useLast(day, ex.id)} className="flex items-center gap-1 shrink-0" style={{ color: C.red, fontSize: 11 }}><RotateCcw size={12} /> Use last</button>}
+                </div>
+
+                <div className="flex flex-col gap-2 mt-1">
+                  {e.sets.map((s, i) => {
+                    const better = prevSets && prevSets[i] && vol(s) > 0 && vol(s) > vol(prevSets[i]);
+                    return (
+                      <div key={i} className="flex items-center gap-1.5 flex-wrap">
+                        <span style={{ color: C.faint, fontSize: 12, width: 14 }} className="font-mono shrink-0">{i + 1}</span>
+                        <Stepper value={s.w} placeholder="lb" highlight={better} onMinus={() => bump(day, ex.id, i, "w", -5)} onPlus={() => bump(day, ex.id, i, "w", 5)} onChange={(v) => setCell(day, ex.id, i, "w", v)} />
+                        <span style={{ color: C.faint }} className="font-mono">×</span>
+                        <Stepper value={s.r} placeholder="reps" highlight={better} narrow onMinus={() => bump(day, ex.id, i, "r", -1)} onPlus={() => bump(day, ex.id, i, "r", 1)} onChange={(v) => setCell(day, ex.id, i, "r", v)} />
+                        <button onClick={() => cycleRpe(day, ex.id, i)} style={{ background: s.rpe ? C.amberDim : "transparent", border: `1px solid ${s.rpe ? C.amber + "66" : C.border}`, color: s.rpe ? C.amber : C.faint, height: 38, minWidth: 46 }} className="rounded-lg px-1 text-xs font-bold font-mono shrink-0">{s.rpe ? `@${s.rpe}` : "RPE"}</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+
+          <button onClick={finishWorkout} style={{ background: C.red, boxShadow: SHADOW }} className="w-full rounded-xl py-3.5 font-extrabold text-white flex items-center justify-center gap-2 mt-1 mb-3"><Check size={18} /> Log workout · {completedCount}/{cfg.ex.length} done</button>
+
+          <PlateCalc />
+          <div className="mt-3"><RestTimer /></div>
+        </div>
+      );
+    }
+
+    function Stepper({ value, onMinus, onPlus, onChange, placeholder, highlight, narrow }) {
+      return (
+        <div className="flex items-center" style={{ flex: 1, minWidth: 110 }}>
+          <button onClick={onMinus} style={{ background: C.surface2, border: `1px solid ${C.border}`, width: 30, height: 38 }} className="rounded-l-lg flex items-center justify-center shrink-0"><Minus size={15} color={C.muted} /></button>
+          <input value={value} onChange={(e) => onChange(e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" placeholder={placeholder} style={{ background: highlight ? C.greenDim : C.surface, border: `1px solid ${highlight ? C.green : C.border}`, color: highlight ? C.green : C.text, width: narrow ? 42 : 50, height: 38 }} className="text-center font-mono font-bold outline-none" />
+          <button onClick={onPlus} style={{ background: C.surface2, border: `1px solid ${C.border}`, width: 30, height: 38 }} className="rounded-r-lg flex items-center justify-center shrink-0"><Plus size={15} color={C.muted} /></button>
+        </div>
+      );
+    }
+
+    function PlateCalc() {
+      const [target, setTarget] = useState("");
+      const [bar, setBar] = useState(45);
+      const t = parseFloat(target) || 0;
+      const { plates, leftover } = platesFor(t, bar);
+      return (
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, boxShadow: SHADOW }} className="rounded-xl p-3">
+          <div className="flex items-center gap-2 mb-2"><Calculator size={16} color={C.red} /><span className="font-bold text-sm">Plate calculator</span></div>
+          <div className="flex gap-2 items-center mb-2">
+            <input value={target} onChange={(e) => setTarget(e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" placeholder="Total weight (lb)" style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }} className="flex-1 rounded-lg px-3 py-2.5 outline-none font-mono" />
+            {[45, 35, 0].map((b) => (<button key={b} onClick={() => setBar(b)} style={{ background: bar === b ? C.red : C.surface2, color: bar === b ? "#fff" : C.muted, border: `1px solid ${bar === b ? C.red : C.border}` }} className="rounded-lg px-2.5 py-2.5 text-xs font-bold">{b === 0 ? "No bar" : `${b}lb bar`}</button>))}
+          </div>
+          {t > bar ? (
+            <div>
+              <div style={{ color: C.faint, fontSize: 11 }} className="mb-1">Per side:</div>
+              <div className="flex flex-wrap gap-1.5">
+                {plates.map((pl, i) => (<span key={i} style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }} className="rounded-md px-2 py-1 text-xs font-bold font-mono">{pl}</span>))}
+                {leftover && <span style={{ color: C.amber, fontSize: 11 }} className="self-center">+{leftover} uneven</span>}
+              </div>
+            </div>
+          ) : (<div style={{ color: C.faint, fontSize: 11 }}>{t > 0 ? "Below bar weight." : "Enter the total you want loaded."}</div>)}
+        </div>
+      );
+    }
+
+    function RestTimer() {
+      const [left, setLeft] = useState(0);
+      const [running, setRunning] = useState(false);
+      const ref = useRef(null);
+      useEffect(() => {
+        if (running && left > 0) ref.current = setTimeout(() => setLeft((l) => l - 1), 1000);
+        else if (running && left === 0) { setRunning(false); try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) {} }
+        return () => clearTimeout(ref.current);
+      }, [running, left]);
+      const start = (s) => { setLeft(s); setRunning(true); };
+      const mmss = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
+      return (
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, boxShadow: SHADOW }} className="rounded-xl p-3">
+          <div className="flex items-center gap-2 mb-2"><Timer size={16} color={C.red} /><span className="font-bold text-sm">Rest timer</span>{running && <span className="ml-auto font-mono font-extrabold" style={{ color: left <= 10 ? C.red : C.green, fontSize: 22 }}>{mmss}</span>}</div>
+          <div className="flex gap-2">
+            {[60, 90, 120].map((s) => (<button key={s} onClick={() => start(s)} style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }} className="flex-1 rounded-lg py-2 font-bold text-sm">{s}s</button>))}
+            <button onClick={() => { setRunning(false); setLeft(0); }} style={{ background: C.redDim, border: `1px solid ${C.red}`, color: C.red }} className="rounded-lg py-2 px-3 font-bold text-sm"><Square size={14} /></button>
+          </div>
+        </div>
+      );
+    }
+
+    function ProgressView({ history, bw, setBw, swaps, deloadAck, persistMain, flash }) {
+      const [w, setW] = useState("");
+      const add = () => {
+        const val = parseFloat(w);
+        if (!val) { flash("Enter a weight"); return; }
+        const next = [...bw, { date: today(), ts: Date.now(), w: val }];
+        setBw(next); persistMain(history, next, swaps, deloadAck); setW(""); flash("Weight logged");
+      };
+      const bwData = bw.map((b) => ({ name: b.date, w: b.w }));
+      const latest = bw.length ? bw[bw.length - 1].w : null;
+      const change = bw.length > 1 ? (bw[bw.length - 1].w - bw[0].w).toFixed(1) : null;
+
+      const muscleVol = {};
+      Object.values(history).flat().forEach((s) => {
+        Object.entries(s.entries).forEach(([id, e]) => {
+          const m = EX_BY_ID[id] && EX_BY_ID[id].m; if (!m) return;
+          muscleVol[m] = (muscleVol[m] || 0) + e.sets.reduce((a, x) => a + vol(x), 0);
+        });
+      });
+      const order = ["chest", "back", "shoulders", "arms", "quads", "hams", "glutes", "calves", "core"];
+      const volData = order.filter((m) => muscleVol[m]).map((m) => ({ name: m, v: Math.round(muscleVol[m]), fill: MUSCLE_COLOR[m] }));
+      const sessions = Object.entries(history).flatMap(([d, arr]) => arr.map((s) => ({ d, ...s }))).sort((a, b) => b.ts - a.ts);
+
+      return (
+        <div className="px-3 pt-4">
+          <div className="flex items-center gap-2 mb-3"><TrendingUp size={18} color={C.red} /><h2 className="font-extrabold" style={{ fontSize: 16 }}>Bodyweight</h2></div>
+          <div className="flex gap-2 mb-3">
+            <input value={w} onChange={(e) => setW(e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" placeholder="Today's weight (lb)" style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text, boxShadow: SHADOW }} className="flex-1 rounded-lg px-3 py-3 outline-none font-mono" />
+            <button onClick={add} style={{ background: C.red }} className="rounded-lg px-5 font-bold text-white">Add</button>
+          </div>
+          {latest && (
+            <div className="flex gap-3 mb-3">
+              <Stat label="Current" value={`${latest} lb`} />
+              <Stat label="Change" value={change ? `${change > 0 ? "+" : ""}${change} lb` : "—"} color={change && change < 0 ? C.green : C.text} />
+              <Stat label="Logged" value={`${bw.length}`} />
+            </div>
+          )}
+          {bwData.length > 1 ? (
+            <div style={{ background: C.surface, border: `1px solid ${C.border}`, height: 200, boxShadow: SHADOW }} className="rounded-xl p-2 mb-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={bwData} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+                  <XAxis dataKey="name" tick={{ fill: C.muted, fontSize: 10 }} stroke={C.border} />
+                  <YAxis domain={["dataMin - 2", "dataMax + 2"]} tick={{ fill: C.muted, fontSize: 10 }} stroke={C.border} />
+                  <Tooltip contentStyle={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text }} />
+                  <Line type="monotone" dataKey="w" stroke={C.red} strokeWidth={2.5} dot={{ r: 3, fill: C.red }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (<div style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.muted, boxShadow: SHADOW }} className="rounded-xl p-5 text-center text-sm mb-4">Log your weight a few times to see the trend. Weigh in daily, judge the 7-day average.</div>)}
+
+          <div className="flex items-center gap-2 mb-3"><Activity size={18} color={C.red} /><h2 className="font-extrabold" style={{ fontSize: 16 }}>Volume by muscle</h2></div>
+          {volData.length ? (
+            <div style={{ background: C.surface, border: `1px solid ${C.border}`, height: 230, boxShadow: SHADOW }} className="rounded-xl p-2 mb-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={volData} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
+                  <XAxis dataKey="name" tick={{ fill: C.muted, fontSize: 9 }} stroke={C.border} interval={0} angle={-30} textAnchor="end" height={48} />
+                  <YAxis tick={{ fill: C.muted, fontSize: 10 }} stroke={C.border} />
+                  <Tooltip contentStyle={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text }} formatter={(v) => [`${v} lb·reps`, "volume"]} />
+                  <Bar dataKey="v" radius={[4, 4, 0, 0]}>{volData.map((d, i) => <Cell key={i} fill={d.fill} />)}</Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (<div style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.muted, boxShadow: SHADOW }} className="rounded-xl p-5 text-center text-sm mb-4">Log a few workouts to see which muscles are getting the most work (total weight × reps).</div>)}
+
+          <h2 className="font-extrabold mb-2" style={{ fontSize: 16 }}>Recent sessions</h2>
+          {sessions.slice(0, 14).map((s, i) => {
+            const setsLogged = Object.values(s.entries).reduce((a, e) => a + e.sets.filter((x) => x.w || x.r).length, 0);
+            return (
+              <div key={i} style={{ background: C.surface, border: `1px solid ${C.border}`, boxShadow: SHADOW }} className="rounded-lg px-3 py-2.5 mb-2 flex items-center justify-between">
+                <div><div className="font-bold text-sm">{s.d}</div><div style={{ color: C.muted, fontSize: 11 }}>{s.date} · {setsLogged} sets logged</div></div>
+                <ChevronRight size={16} color={C.faint} />
+              </div>
+            );
+          })}
+          {sessions.length === 0 && <div style={{ color: C.muted }} className="text-sm text-center py-4">No sessions yet. Finish a workout to start your history.</div>}
+        </div>
+      );
+    }
+
+    function Stat({ label, value, color }) {
+      return (
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, boxShadow: SHADOW }} className="flex-1 rounded-lg px-3 py-2">
+          <div style={{ color: C.faint, fontSize: 10 }} className="uppercase tracking-wide">{label}</div>
+          <div className="font-extrabold font-mono" style={{ fontSize: 18, color: color || C.text }}>{value}</div>
+        </div>
+      );
+    }
+
+    function TargetsView({ weeksIn }) {
+      return (
+        <div className="px-3 pt-4">
+          <div className="flex items-center gap-2 mb-3"><Flame size={18} color={C.red} /><h2 className="font-extrabold" style={{ fontSize: 16 }}>Daily targets</h2></div>
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            {TARGETS.map(([k, v, note]) => (
+              <div key={k} style={{ background: C.surface, border: `1px solid ${C.border}`, boxShadow: SHADOW }} className="rounded-xl p-3">
+                <div style={{ color: C.muted, fontSize: 11 }} className="uppercase tracking-wide">{k}</div>
+                <div className="font-extrabold font-mono" style={{ fontSize: 22 }}>{v}</div>
+                <div style={{ color: C.faint, fontSize: 10.5 }} className="leading-tight mt-0.5">{note}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ background: C.redDim, border: `1px solid ${C.red}33`, color: C.redInk }} className="rounded-lg px-3 py-2 mb-4 text-xs leading-snug">Cardio: 2–3 × 20–30 min incline-treadmill walks/week. Zero spinal stress. Use the deficit to lose fat, not cardio.</div>
+          <h2 className="font-extrabold mb-2" style={{ fontSize: 16 }}>The 4 rules</h2>
+          {RULES.map(([t, b], i) => (
+            <div key={i} style={{ background: C.surface, border: `1px solid ${C.border}`, boxShadow: SHADOW }} className="rounded-xl p-3 mb-2">
+              <div className="font-bold text-sm" style={{ color: C.red }}>{t}</div>
+              <div style={{ color: C.muted, fontSize: 12.5 }} className="leading-snug mt-0.5">{b}</div>
+            </div>
+          ))}
+          <div style={{ background: C.amberDim, border: `1px solid ${C.amber}55`, color: C.amberInk }} className="rounded-lg px-3 py-2.5 mt-3 text-xs leading-snug"><span className="font-bold" style={{ color: C.amber }}>Deload every 6 weeks.</span> You're currently {weeksIn} week{weeksIn === 1 ? "" : "s"} in. Every 6th week, drop to ~60% weight to let connective tissue catch up — the app reminds you.</div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+    }
+  </script>
+</body>
+</html>
